@@ -1,22 +1,41 @@
 import React, { useState, useEffect } from "react";
 import { Box, Container, VStack, Heading, Text, Input, Button, List, ListItem, useToast, Textarea, Select, FormControl } from "@chakra-ui/react";
 import { FaDumbbell, FaRunning, FaWeight } from "react-icons/fa";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 const Index = () => {
   const [workouts, setWorkouts] = useState([]);
   const [newWorkout, setNewWorkout] = useState("");
   const [workoutType, setWorkoutType] = useState("");
   const [workoutDuration, setWorkoutDuration] = useState("");
+  const [progressData, setProgressData] = useState([]);
   const toast = useToast();
 
   useEffect(() => {
     const savedWorkouts = JSON.parse(localStorage.getItem("workouts")) || [];
     setWorkouts(savedWorkouts);
+    
+    // Calculate progress data
+    const progressData = calculateProgressData(savedWorkouts);
+    setProgressData(progressData);
   }, []);
 
   useEffect(() => {
     localStorage.setItem("workouts", JSON.stringify(workouts));
   }, [workouts]);
+
+  const calculateProgressData = (workouts) => {
+    const data = {};
+    workouts.forEach(workout => {
+      const date = new Date(workout.id).toLocaleDateString();
+      if (!data[date]) {
+        data[date] = { date, totalDuration: 0, workoutCount: 0 };
+      }
+      data[date].totalDuration += parseInt(workout.duration);
+      data[date].workoutCount += 1;
+    });
+    return Object.values(data).sort((a, b) => new Date(a.date) - new Date(b.date));
+  };
 
   const addWorkout = () => {
     if (newWorkout.trim() === "" || workoutType.trim() === "" || workoutDuration.trim() === "") {
@@ -29,7 +48,10 @@ const Index = () => {
       });
       return;
     }
-    setWorkouts([...workouts, { id: Date.now(), name: newWorkout, type: workoutType, duration: workoutDuration }]);
+    const newWorkouts = [...workouts, { id: Date.now(), name: newWorkout, type: workoutType, duration: workoutDuration }];
+    setWorkouts(newWorkouts);
+    const newProgressData = calculateProgressData(newWorkouts);
+    setProgressData(newProgressData);
     setNewWorkout("");
     setWorkoutType("");
     setWorkoutDuration("");
@@ -43,7 +65,10 @@ const Index = () => {
   };
 
   const deleteWorkout = (id) => {
-    setWorkouts(workouts.filter(workout => workout.id !== id));
+    const updatedWorkouts = workouts.filter(workout => workout.id !== id);
+    setWorkouts(updatedWorkouts);
+    const newProgressData = calculateProgressData(updatedWorkouts);
+    setProgressData(newProgressData);
     toast({
       title: "Workout deleted",
       description: "Your workout has been removed",
@@ -126,6 +151,22 @@ const Index = () => {
           <Text fontSize="lg" fontWeight="bold">Statistics</Text>
           <Text>Total Workouts: {workouts.length}</Text>
           <Text>Total Duration: {totalDuration} min</Text>
+        </Box>
+
+        <Box mt={8}>
+          <Heading size="md" mb={4}>Your Progress</Heading>
+          <ResponsiveContainer width="100%" height={300}>
+            <LineChart data={progressData}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="date" />
+              <YAxis yAxisId="left" />
+              <YAxis yAxisId="right" orientation="right" />
+              <Tooltip />
+              <Legend />
+              <Line yAxisId="left" type="monotone" dataKey="totalDuration" stroke="#8884d8" name="Total Duration (min)" />
+              <Line yAxisId="right" type="monotone" dataKey="workoutCount" stroke="#82ca9d" name="Workout Count" />
+            </LineChart>
+          </ResponsiveContainer>
         </Box>
       </VStack>
     </Container>
